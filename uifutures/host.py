@@ -14,6 +14,10 @@ from .utils import debug
 
 
 class MessageProcessor(QtCore.QThread):
+
+    executor_message = QtCore.pyqtSignal([object])
+    new_worker = QtCore.pyqtSignal([object, object])
+    worker_message = QtCore.pyqtSignal([object, object, object])
     
     def __init__(self, conn):
         super(MessageProcessor, self).__init__()
@@ -54,9 +58,12 @@ class MessageProcessor(QtCore.QThread):
                         continue
                     
                     if owner_type == 'executor':
-                        handler(**msg)
+                        if handler:
+                            handler(**msg)
+                        self.executor_message.emit(msg)
                     else:
                         handler(worker, **msg)
+                        self.worker_message.emit(worker, type_, msg)
         
         except:
             traceback.print_exc()
@@ -64,8 +71,10 @@ class MessageProcessor(QtCore.QThread):
             self.conn.send(dict(type='shutdown'))
             exit()
     
-    def do_executor_submit(self, uuid, func_name, **msg):
-        worker = Worker(uuid)
+    def do_executor_submit(self, uuid, **msg):
+        
+        worker = Worker(uuid, **msg)
+        self.new_worker.emit(worker, msg)
         
         # Forward the message.
         msg['type'] = 'submit'
@@ -106,9 +115,10 @@ class MessageProcessor(QtCore.QThread):
 
 class Worker(object):
     
-    def __init__(self, uuid):
+    def __init__(self, uuid, **msg):
     
         self.uuid = uuid
+        # self.widget = WorkerWidget(self, **msg)
         
         # Launch a worker, and tell it to connect to us.
         self.conn, child_conn = connection.Pipe()
@@ -124,20 +134,80 @@ class Worker(object):
         
 
 
+class WorkerWidget(QtGui.QFrame):
+    
+    def __init__(self, worker, func_name, **extra):
+        super(WorkerWidget, self).__init__()
+        self._worker = worker
+        self._func_name = func_name
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        self.setLayout(QtGui.QHBoxLayout())
+        
+        self._icon = QtGui.QLabel()
+        self.layout().addWidget(self._icon)
+        pixmap = QtGui.QPixmap('/home/mboers/Documents/icons/fatcow/32x32/gear_in.png')
+        self._icon.setPixmap(pixmap)
+        self._icon.setFixedSize(pixmap.size())
+        
+        main_layout = QtGui.QVBoxLayout()
+        self.layout().addLayout(main_layout)
+        
+        self._name = QtGui.QLabel(self._func_name)
+        main_layout.addWidget(self._name)
+        
+        self._progress = QtGui.QProgressBar()
+        self._progress.setFixedHeight(10)
+        self._progress.setRange(0, 0)
+        main_layout.addWidget(self._progress)
+                
+        self._status = QtGui.QLabel('starting...')
+        font = self._status.font()
+        font.setPointSize(10)
+        self._status.setFont(font)
+        main_layout.addWidget(self._status)
+    
+    def _handle_message(self, type_, **msg):
+        if type_ == 'result':
+            self._status.setText('Done.')
+            self._progress.setRange(0, 1)
+            self._progress.setValue(1)
+            
+        if type_ == 'exception':
+            self._status.setText('Error.')
+            self._progress.setRange(0, 1)
+            self._progress.setValue(0)
+        
+
+
 class Dialog(QtGui.QDialog):
     
-    def __init__(self):
+    def __init__(self, message_processor):
         super(Dialog, self).__init__()
         self._setup_ui()
+        self._uuid_to_widget = {}
+        
+        message_processor.new_worker.connect(self._on_new_worker)
+        message_processor.worker_message.connect(self._on_worker_message)
     
     def _setup_ui(self):
         
         self.setWindowTitle("UI Futures")
-        self.setLayout(QtGui.QVBoxLayout())
+        self.setMinimumWidth(400)
         
-        button = QtGui.QPushButton('Exit')
-        button.clicked.connect(lambda *args: exit())
-        self.layout().addWidget(button)
+        self.setLayout(QtGui.QVBoxLayout())
+        self.layout().setSpacing(0)
+        self.layout().setContentsMargins(0, 0, 0, 0)
+    
+    def _on_new_worker(self, worker, msg):
+        widget = WorkerWidget(worker, **msg)
+        self._uuid_to_widget[worker.uuid] = widget
+        self.layout().addWidget(widget)
+    
+    def _on_worker_message(self, worker, type_, msg):
+        self._uuid_to_widget[worker.uuid]._handle_message(type_, **msg)
+            
     
 
 
@@ -150,13 +220,16 @@ def main():
         type='handshake',
         pid=os.getpid(),
     ))
+
     message_processor = MessageProcessor(conn)
-    message_processor.start()
     
     app = QtGui.QApplication([])
     app.setApplicationName('Futures Host')
     
-    dialog = Dialog()
+    dialog = Dialog(message_processor)
+
+    message_processor.start()
+    
     dialog.show()
     
     app.exec_()
