@@ -2,6 +2,7 @@ import sys
 import os
 import traceback
 from multiprocessing import connection
+import _multiprocessing
 import pprint
 
 from PyQt4 import QtCore, QtGui
@@ -74,8 +75,8 @@ class Dialog(QtGui.QDialog):
 def main():
     
     # Connect to the executor, and start the listener.
-    address = sys.argv[1]
-    conn = connection.Client(address)
+    fd = int(sys.argv[1])
+    conn = _multiprocessing.Connection(fd)
     conn.send(dict(
         type='handshake',
         pid=os.getpid(),

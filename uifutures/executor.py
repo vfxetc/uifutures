@@ -20,22 +20,13 @@ class Executor(_base.Executor):
     
     def __init__(self):
         
-        # We jump through some hoops with Unix sockets here, even though we
-        # could be using multiprocessing's Pipe object.
-        
-        # Listen to a random Unix socket.
-        address = tempfile.mktemp(prefix='uifutures.', suffix='.sock')
-        listener = connection.Listener(address)
-        
         # Launch a host, and tell it to connect to us.
-        cmd = ['python', '-m', 'uifutures.host', address]
+        self._conn, child_conn = connection.Pipe()
+        cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
         proc = subprocess.Popen(cmd)
         
-        # Wait for the connection, then kill the socket.
-        listener._listener._socket.settimeout(3)
-        self._conn = listener.accept()
-        os.unlink(address)
-        
+        # Wait for the handshake.
+        # TODO: Make this non-blocking, or have a timeout.
         msg = self._conn.recv()
         if msg.get('type') != 'handshake' or msg.get('pid') != proc.pid:
             raise RuntimeError('could not shake hands with host: %r' % msg)
