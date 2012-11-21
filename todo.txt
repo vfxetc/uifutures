@@ -1,13 +1,14 @@
-- seperate process per executor
-- send it pickles via a socket
-- get results back via a socket
+
 - growl (or QtApplication.notify) when done
 
-- bgfutures.job.set_progress(type_, value, text=None, total=None)
-    - several different types track their totals indepedantly
+- set_progress(value, maximum=None, task=None, status=None)
+- set_status(message)
+- notify(message)
+- user_cancelled()
 
-- uifutures.Executor()
-    - eventually reconnect to existing one, but don't bother for now
+
+- uifutures.Executor(title='Job Queue', app_key='default')
+    - eventually reconnect to /tmp/uifutures.{app_key}.sock
     - set app name
     - set app icon
 

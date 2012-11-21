@@ -50,19 +50,17 @@ class MessageProcessor(QtCore.QThread):
                             return
                     
                     type_ = msg.pop('type', None)
-                    debug('Host: %r send %r:\n%s', owner_type, type_, pprint.pformat(msg))
+                    # debug('Host: %r sent %r:\n%s', owner_type, type_, pprint.pformat(msg))
                     
                     handler = getattr(self, 'do_%s_%s' % (owner_type, type_ or 'unknown'), None)
-                    if not handler:
-                        debug('Host: no %s handler for %r', owner_type, type_)
-                        continue
                     
                     if owner_type == 'executor':
                         if handler:
                             handler(**msg)
                         self.executor_message.emit(msg)
                     else:
-                        handler(worker, **msg)
+                        if handler:
+                            handler(worker, **msg)
                         self.worker_message.emit(worker, type_, msg)
         
         except:
@@ -122,7 +120,7 @@ class Worker(object):
         
         # Launch a worker, and tell it to connect to us.
         self.conn, child_conn = connection.Pipe()
-        cmd = ['python', '-m', 'uifutures.worker', str(child_conn.fileno())]
+        cmd = ['python', '-m', 'uifutures.sandbox.the_corner', str(child_conn.fileno())]
         proc = subprocess.Popen(cmd)
         child_conn.close()
         
@@ -169,6 +167,7 @@ class WorkerWidget(QtGui.QFrame):
         main_layout.addWidget(self._status)
     
     def _handle_message(self, type_, **msg):
+        
         if type_ == 'result':
             self._status.setText('Done.')
             self._progress.setRange(0, 1)
@@ -178,6 +177,21 @@ class WorkerWidget(QtGui.QFrame):
             self._status.setText('Error.')
             self._progress.setRange(0, 1)
             self._progress.setValue(0)
+        
+        if type_ == 'progress':
+            
+            maximum = msg.get('maximum')
+            if maximum is not None:
+                self._progress.setMaximum(maximum)
+            
+            value = msg.get('value')
+            if value is not None:
+                self._progress.setValue(value)
+            
+            status = msg.get('status')
+            if status is not None:
+                self._status.setText(str(status))
+            
         
 
 
@@ -193,7 +207,7 @@ class Dialog(QtGui.QDialog):
     
     def _setup_ui(self):
         
-        self.setWindowTitle("UI Futures")
+        self.setWindowTitle("Job Queue")
         self.setMinimumWidth(400)
         
         self.setLayout(QtGui.QVBoxLayout())
@@ -214,7 +228,7 @@ class Dialog(QtGui.QDialog):
 def main():
     
     # Connect to the executor, and start the listener.
-    fd = int(sys.argv[1])
+    fd = int(os.environ.get('UIFUTURES_HOST_FD') or sys.argv[1])
     conn = _multiprocessing.Connection(fd)
     conn.send(dict(
         type='handshake',
@@ -225,9 +239,12 @@ def main():
     
     app = QtGui.QApplication([])
     app.setApplicationName('Futures Host')
+    app.setWindowIcon(QtGui.QIcon('/home/mboers/Documents/icons/fatcow/32x32/road_sign.png'))
     
     dialog = Dialog(message_processor)
-
+    # dialog.setWindowIcon(QtGui.QIcon('/home/mboers/Documents/icons/fatcow/32x32/road_sign.png'))
+    # dialog.setWindowIconText("Testing")
+    
     message_processor.start()
     
     dialog.show()

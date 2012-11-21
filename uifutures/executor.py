@@ -24,8 +24,18 @@ class Executor(_base.Executor):
         
         # Launch a host, and tell it to connect to us.
         self._conn, child_conn = connection.Pipe()
-        cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
-        proc = subprocess.Popen(cmd)
+        
+        if False:
+            cmd = [os.path.abspath(os.path.join(
+                __file__, '..', '..', 'Futures.app', 'Contents', 'MacOS', 'uifutures' 
+            ))]
+            env = dict(os.environ)
+            env['UIFUTURES_HOST_FD'] = str(child_conn.fileno())
+        else:
+            cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
+            env = None
+        
+        proc = subprocess.Popen(cmd, env=env)
         child_conn.close()
         
         # Wait for the handshake.
@@ -48,7 +58,7 @@ class Executor(_base.Executor):
                     rlist, _, _ = select.select([self._conn], [], [])
                     msg = self._conn.recv()
                     type_ = msg.pop('type', None)
-                    debug('Executor: new message of type %r:\n%s', type_, pprint.pformat(msg))
+                    # debug('Executor: new message of type %r:\n%s', type_, pprint.pformat(msg))
                     handler = getattr(self, '_do_' + (type_ or 'missing'), None)
                     if not handler:
                         debug('Executor: no handler for %r', type_)
@@ -72,7 +82,7 @@ class Executor(_base.Executor):
             future.set_exception(HostShutdown('host shutdown'))
     
     def _do_result(self, uuid, **msg):
-        debug('Executor: %s finished', uuid)
+        # debug('Executor: %s finished', uuid)
         future = self._futures.pop(uuid)
         
         result = (pickle.loads(msg['package']) if 'package' in msg else msg)['result']
