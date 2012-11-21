@@ -1,0 +1,17 @@
+- seperate process per executor
+- send it pickles via a socket
+- get results back via a socket
+- growl (or QtApplication.notify) when done
+
+- bgfutures.job.set_progress(type_, value, text=None, total=None)
+    - several different types track their totals indepedantly
+
+- uifutures.Executor()
+    - eventually reconnect to existing one, but don't bother for now
+    - set app name
+    - set app icon
+
+- dependencies
+
+- spawn an independant process for each actual job, just like I did for qbfutures, so that we don't have to worry about code reloading, threading, etc.
+
