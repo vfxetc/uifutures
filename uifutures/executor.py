@@ -24,6 +24,7 @@ class Executor(_base.Executor):
         self._conn, child_conn = connection.Pipe()
         cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
         proc = subprocess.Popen(cmd)
+        child_conn.close()
         
         # Wait for the handshake.
         # TODO: Make this non-blocking, or have a timeout.
@@ -83,7 +84,7 @@ class Executor(_base.Executor):
         uuid = os.urandom(16).encode('hex')
         
         self._conn.send(dict(
-            type='job',
+            type='submit',
             uuid=uuid,
             func=func,
             args=args,
