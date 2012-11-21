@@ -1,15 +1,14 @@
-import subprocess
-import platform
-import os
-import tempfile
-from multiprocessing import connection
 from concurrent.futures import _base
+from multiprocessing import connection
+import os
+import platform
+import pprint
+import select
+import subprocess
+import tempfile
 import threading
 import time
-import select
-import pprint
 
-from .future import Future
 from .utils import debug
 
 
@@ -21,25 +20,32 @@ class Executor(_base.Executor):
     
     def __init__(self):
         
+        # We jump through some hoops with Unix sockets here, even though we
+        # could be using multiprocessing's Pipe object.
+        
+        # Listen to a random Unix socket.
         address = tempfile.mktemp(prefix='uifutures.', suffix='.sock')
         listener = connection.Listener(address)
         
+        # Launch a host, and tell it to connect to us.
         cmd = ['python', '-m', 'uifutures.host', address]
         proc = subprocess.Popen(cmd)
         
+        # Wait for the connection, then kill the socket.
         listener._listener._socket.settimeout(3)
         self._conn = listener.accept()
+        os.unlink(address)
         
         msg = self._conn.recv()
         if msg.get('type') != 'handshake' or msg.get('pid') != proc.pid:
             raise RuntimeError('could not shake hands with host: %r' % msg)
         
         self._futures = {}
+        
         self._host_alive = True
-        self._listener_thread = threading.Thread(target=self._host_listener)
-        self._listener_thread.daemon = True
-        self._listener_thread.start()
-        self._listener_sleep = 0
+        self._host_listener_thread = threading.Thread(target=self._host_listener)
+        self._host_listener_thread.daemon = True
+        self._host_listener_thread.start()
         
     def _host_listener(self):
         try:
@@ -93,7 +99,7 @@ class Executor(_base.Executor):
             kwargs=kwargs,
         ))
         
-        future = Future()
+        future = _base.Future()
         self._futures[uuid] = future
         return future
         
