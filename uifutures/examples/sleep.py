@@ -3,7 +3,11 @@ import time
 from uifutures import Executor
 
 def worker():
-    time.sleep(5)
+    for i in xrange(5):
+        print '%d...' % (5 - i)
+        time.sleep(0.2)
+    print 'DONE!'
+    return 'you slept well'
 
 if __name__ == '__main__':
     

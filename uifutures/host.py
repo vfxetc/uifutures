@@ -20,12 +20,12 @@ class Listener(QtCore.QThread):
         try:
             while True:
                 msg = self.conn.recv()
-                debug('Host: new message of type %r:\n%s', msg.get('type'), pprint.pformat(msg))
-                handler = getattr(self, 'do_' + msg.get('type', 'missing'), None)
+                type_ = msg.pop('type', None)
+                debug('Host: new message of type %r:\n%s',type_, pprint.pformat(msg))
+                handler = getattr(self, 'do_' + (type_ or 'missing'), None)
                 if not handler:
                     debug('Host: no handler for %r', msg.get('type'))
                     continue
-                msg.pop('type')
                 handler(**msg)
         except EOFError:
             pass
@@ -36,13 +36,22 @@ class Listener(QtCore.QThread):
             exit()
     
     def do_job(self, uuid, func, args, kwargs):
-        res = func(*args, **kwargs)
-        debug('Host: result: %r', res)
-        self.conn.send(dict(
-            type='result',
-            uuid=uuid,
-            result=res
-        ))
+        try:
+            res = func(*args, **kwargs)
+        except Exception as e:
+            debug('Host: exception: %r', e)
+            self.conn.send(dict(
+                type='exception',
+                uuid=uuid,
+                exception=e,
+            ))
+        else:
+            debug('Host: result: %r', res)
+            self.conn.send(dict(
+                type='result',
+                uuid=uuid,
+                result=res
+            ))
 
 
 class Dialog(QtGui.QDialog):
