@@ -1,6 +1,7 @@
 import sys
 import time
 import thread
+import re
 
 
 _debug_start = time.time()
@@ -15,3 +16,23 @@ def debug(msg, *args):
     sys.stdout.write('# %8.3f (%8.3f) %3d %s\n' % ((current_time - _debug_start) * 1000, (current_time - _debug_last) * 1000, ident, msg))
     sys.stdout.flush()
     _debug_last = current_time
+
+
+def get_func(spec):
+    if not isinstance(spec, basestring):
+        return spec
+    
+    m = re.match(r'([\w\.]+):([\w]+)$', spec)
+    if not m:
+        raise ValueError('string funcs must be for form "package.module:function"')
+    mod_name, func_name = m.groups()
+    mod = __import__(mod_name, fromlist=['.'])
+    return getattr(mod, func_name)
+
+
+def get_func_name(spec):
+    if isinstance(spec, basestring):
+        return spec
+    return '%s.%s' % (getattr(spec, '__module__', '__module__'), getattr(spec, '__name__', str(spec)))
+
+

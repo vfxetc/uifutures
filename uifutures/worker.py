@@ -3,6 +3,7 @@ import _multiprocessing
 import pprint
 import sys
 import os
+import cPickle as pickle
 
 from .utils import debug
         # 
@@ -39,7 +40,12 @@ def main():
     try:
         process(conn)
     except Exception as e:
-        conn.send(dict(type='exception', exception=e))
+        conn.send(dict(
+            type='exception',
+            package=pickle.dumps(dict(
+                exception=e,
+            ), protocol=-1),
+        ))
 
 def process(conn):
     
@@ -47,9 +53,15 @@ def process(conn):
     rlist, _, _ = select.select([conn], [], [])
     msg = conn.recv()
     debug('Worker: recieved message\n%s', pprint.pformat(msg))
-
-    res = msg['func'](*msg['args'], **msg['kwargs'])
-    conn.send(dict(type='result', result=res))
+    
+    package = pickle.loads(msg['package'])
+    res = package['func'](*package['args'], **package['kwargs'])
+    conn.send(dict(
+        type='result',
+        package=pickle.dumps(dict(
+            result=res
+        ), protocol=-1),
+    ))
     
 
 if __name__ == '__main__':

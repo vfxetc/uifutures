@@ -1,5 +1,6 @@
 from concurrent.futures import _base
 from multiprocessing import connection
+import cPickle as pickle
 import os
 import platform
 import pprint
@@ -10,6 +11,7 @@ import threading
 import time
 
 from .utils import debug
+from . import utils
 
 
 class HostShutdown(RuntimeError):
@@ -69,14 +71,17 @@ class Executor(_base.Executor):
         for future in self._futures.itervalues():
             future.set_exception(HostShutdown('host shutdown'))
     
-    def _do_result(self, uuid, result):
+    def _do_result(self, uuid, **msg):
         debug('Executor: %s finished', uuid)
         future = self._futures.pop(uuid)
+        
+        result = (pickle.loads(msg['package']) if 'package' in msg else msg)['result']
         future.set_result(result)
         
-    def _do_exception(self, uuid, exception):
+    def _do_exception(self, uuid, **msg):
         debug('Executor: %s errored', uuid)
         future = self._futures.pop(uuid)
+        exception = (pickle.loads(msg['package']) if 'package' in msg else msg)['exception']
         future.set_exception(exception)
     
     def submit(self, func, *args, **kwargs):
@@ -86,9 +91,12 @@ class Executor(_base.Executor):
         self._conn.send(dict(
             type='submit',
             uuid=uuid,
-            func=func,
-            args=args,
-            kwargs=kwargs,
+            func_name=utils.get_func_name(func),
+            package=pickle.dumps(dict(
+                func=func,
+                args=args,
+                kwargs=kwargs,
+            ), protocol=-1),
         ))
         
         future = _base.Future()

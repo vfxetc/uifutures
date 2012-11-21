@@ -64,33 +64,32 @@ class MessageProcessor(QtCore.QThread):
             self.conn.send(dict(type='shutdown'))
             exit()
     
-    def do_executor_submit(self, uuid, func, args, kwargs):
+    def do_executor_submit(self, uuid, func_name, **msg):
         worker = Worker(uuid)
-        worker.conn.send(dict(
-            type='submit',
-            uuid=uuid,
-            func=func,
-            args=args,
-            kwargs=kwargs,
-        ))
+        
+        # Forward the message.
+        msg['type'] = 'submit'
+        msg['uuid'] = uuid
+        worker.conn.send(msg)
+        
         self.workers.append(worker)
         self.open_jobs.add(uuid)
     
-    def do_worker_result(self, worker, result):
+    def do_worker_result(self, worker, **msg):
         self.open_jobs.remove(worker.uuid)
-        self.conn.send(dict(
-            type='result',
-            uuid=worker.uuid,
-            result=result,
-        ))
+        
+        # Forward the message.
+        msg['type'] = 'result'
+        msg['uuid'] = worker.uuid
+        self.conn.send(msg)
     
-    def do_worker_exception(self, worker, exception):
+    def do_worker_exception(self, worker, **msg):
         self.open_jobs.remove(worker.uuid)
-        self.conn.send(dict(
-            type='exception',
-            uuid=worker.uuid,
-            exception=exception,
-        ))
+        
+        # Forward the message.
+        msg['type'] = 'exception'
+        msg['uuid'] = worker.uuid
+        self.conn.send(msg)
         
     def do_worker_shutdown(self, worker):
         
