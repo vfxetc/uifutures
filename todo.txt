@@ -1,4 +1,13 @@
 
+- send traceback with exception message
+- display traceback to user (in collapsed groupbox, or on right click)
+
+- bug report
+
+- max_workers on executor
+- priority on jobs
+- drag jobs around to reprioritize
+
 - uifutures.worker.did_user_cancel()
 
 - uifutures.Executor(title='Job Queue', app_key='default')
@@ -17,3 +26,4 @@
     - they appear as additional progress bars and status lines under the main
       one
 
+- jobs can prompt for buttons, like the Finder copy override buttons

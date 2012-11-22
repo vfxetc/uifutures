@@ -16,9 +16,14 @@ from .executor import DependencyFailed
 
 
 class Host(QtCore.QThread):
-
+    
+    # (message)
     executor_message = QtCore.pyqtSignal([object])
+    
+    # (worker, submit_message)
     new_worker = QtCore.pyqtSignal([object, object])
+    
+    # (worker, type, message)
     worker_message = QtCore.pyqtSignal([object, object, object])
     
     def __init__(self, conn):
@@ -42,7 +47,10 @@ class Host(QtCore.QThread):
                 self.blocked_workers = []
                 for worker in blocked_workers:
                     worker.poke()
-                    if worker.started:
+                    if worker.dependency_failed:
+                        self.failed_jobs.add(worker.uuid)
+                        self.worker_message.emit(worker, "dependency_failed", {})
+                    elif worker.started:
                         self.active_workers.append(worker)
                     else:
                         self.blocked_workers.append(worker)
@@ -136,8 +144,8 @@ class Host(QtCore.QThread):
         msg['uuid'] = worker.uuid
         self.send(msg)
         utils.notify(
-            title="Job Errored",
-            message=worker.name or 'Untitled',
+            title='Job Failed: %s' % (worker.name or 'Untitled'),
+            message='{exception_name}: {exception_message}'.format(**msg),
             sticky=True,
             icon=utils.icon(worker.icon) if worker.icon else None,
         )
@@ -170,14 +178,19 @@ class Worker(object):
         
         self.started = False
         self.depends_on = submit_msg['depends_on']
+        self.dependency_failed = False
         self.poke()
     
     def poke(self):
         
-        if self.started:
+        if self.started or self.dependency_failed:
             return
         
-        if any(x in self.host.active_jobs or x in self.host.failed_jobs for x in self.depends_on):
+        if any(x in self.host.failed_jobs for x in self.depends_on):
+            self.dependency_failed = True
+            return
+        
+        if any(x in self.host.active_jobs for x in self.depends_on):
             return
         
         self.started = True
@@ -199,6 +212,9 @@ class WorkerWidget(QtGui.QFrame):
         super(WorkerWidget, self).__init__()
         self._worker = worker
         self._setup_ui()
+        
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu)
     
     def _setup_ui(self):
         self.setLayout(QtGui.QHBoxLayout())
@@ -234,6 +250,11 @@ class WorkerWidget(QtGui.QFrame):
         self._status.setFont(font)
         main_layout.addWidget(self._status)
     
+    def _on_context_menu(self, point):
+        menu = QtGui.QMenu()
+        menu.addAction("Test Context Menu")
+        menu.exec_(self.mapToGlobal(point))
+        
     def _handle_message(self, type_, **msg):
         handler = getattr(self, '_do_worker_%s' % type_, None)
         if handler is None:
@@ -251,11 +272,18 @@ class WorkerWidget(QtGui.QFrame):
         self._progress.setRange(0, 1)
         self._progress.setValue(1)
     
-    def _do_worker_exception(self, **msg):
-        self._status.setText('Error.')
+    def _do_worker_exception(self, exception_name, exception_message, **msg):
+        self._set_failure('%s: %s' % (exception_name, exception_message))
+    
+    def _do_worker_dependency_failed(self, **msg):
+        self._set_failure('Dependency failed.')
+    
+    def _set_failure(self, message):
+        self._status.setText(message)
+        self._status.setStyleSheet('color: darkRed;')
         self._progress.setRange(0, 1)
         self._progress.setValue(0)
-    
+        
     def _do_worker_progress(self, value=None, maximum=None, status=None, **msg):
         if maximum is not None:
             self._progress.setMaximum(maximum)

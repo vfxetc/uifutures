@@ -45,6 +45,8 @@ def main():
     except Exception as e:
         conn.send(dict(
             type='exception',
+            exception_name=type(e).__name__,
+            exception_message=str(e),
             package=pickle.dumps(dict(
                 exception=e,
             ), protocol=-1),
