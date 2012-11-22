@@ -15,26 +15,40 @@ from . import utils
 from .executor import DependencyFailed
 
 
-class MessageProcessor(QtCore.QThread):
+class Host(QtCore.QThread):
 
     executor_message = QtCore.pyqtSignal([object])
     new_worker = QtCore.pyqtSignal([object, object])
     worker_message = QtCore.pyqtSignal([object, object, object])
     
     def __init__(self, conn):
-        super(MessageProcessor, self).__init__()
+        super(Host, self).__init__()
+        
+        # Will be set to None if the connection is closed.
         self.conn = conn
-        self.workers = []
-        self.open_jobs = set()
+        
+        self.active_workers = []
+        self.blocked_workers = []
+        
+        self.active_jobs = set()
         self.failed_jobs = set()
-        self.executor_is_alive = True
     
     def run(self):
         try:
             while True:
                 
-                rlist = [worker.conn for worker in self.workers]
-                if self.executor_is_alive:
+                # Poke all the blocked workers.
+                blocked_workers = self.blocked_workers
+                self.blocked_workers = []
+                for worker in blocked_workers:
+                    worker.poke()
+                    if worker.started:
+                        self.active_workers.append(worker)
+                    else:
+                        self.blocked_workers.append(worker)
+                
+                rlist = [worker.conn for worker in self.active_workers]
+                if self.conn is not None:
                     rlist.append(self.conn)
                     
                 if not rlist:
@@ -47,7 +61,7 @@ class MessageProcessor(QtCore.QThread):
                         owner_type = 'executor'
                     else:
                         owner_type = 'worker'
-                        worker = [x for x in self.workers if x.conn is conn][0]
+                        worker = [x for x in self.active_workers if x.conn is conn][0]
                     
                     # Get a message, turning EOFs into shutdown messages.
                     try:
@@ -74,21 +88,30 @@ class MessageProcessor(QtCore.QThread):
             QtGui.QApplication.exit(1)
         
         finally:
-            if self.executor_is_alive:
+            if self.conn is not None:
                 self.conn.send(dict(type='shutdown'))
         
         if not self.failed_jobs:
             QtGui.QApplication.exit(0)
     
+    def send(self, msg):
+        if self.conn is not None:
+            self.conn.send(msg)
+    
     def do_executor_submit(self, uuid, **msg):
-        self.open_jobs.add(uuid)
-        worker = Worker(uuid, **msg)
+        self.active_jobs.add(uuid)
+        worker = Worker(self, uuid, **msg)
         self.new_worker.emit(worker, msg)
-        self.workers.append(worker)
+        
+        if worker.started:
+            self.active_workers.append(worker)
+        else:
+            self.blocked_workers.append(worker)
+            self.worker_message.emit(worker, 'blocked', {})
     
     def do_executor_shutdown(self, **msg):
         # debug('Host: executor shut down')
-        self.executor_is_alive = False
+        self.conn = None
     
     def do_worker_notify(self, worker, **msg):
         msg.setdefault('icon', worker.icon)
@@ -96,22 +119,22 @@ class MessageProcessor(QtCore.QThread):
         utils.notify(**msg)
     
     def do_worker_result(self, worker, **msg):
-        self.open_jobs.remove(worker.uuid)
+        self.active_jobs.remove(worker.uuid)
         
         # Forward the message.
         msg['type'] = 'result'
         msg['uuid'] = worker.uuid
-        self.conn.send(msg)
+        self.send(msg)
     
     def do_worker_exception(self, worker, **msg):
         
         self.failed_jobs.add(worker.uuid)
-        self.open_jobs.remove(worker.uuid)
+        self.active_jobs.remove(worker.uuid)
         
         # Forward the message.
         msg['type'] = 'exception'
         msg['uuid'] = worker.uuid
-        self.conn.send(msg)
+        self.send(msg)
         utils.notify(
             title="Job Errored",
             message=worker.name or 'Untitled',
@@ -122,10 +145,10 @@ class MessageProcessor(QtCore.QThread):
     def do_worker_shutdown(self, worker):
         
         # Remove it from the list.
-        self.workers = [x for x in self.workers if x is not worker]
+        self.active_workers = [x for x in self.active_workers if x is not worker]
         
         # It wasn't done it's job.
-        if worker.uuid in self.open_jobs:
+        if worker.uuid in self.active_jobs:
             self.do_worker_exception(worker, dict(
                 type='exception',
                 exception=RuntimeError('worker shutdown unexpectedly'),
@@ -134,8 +157,9 @@ class MessageProcessor(QtCore.QThread):
 
 class Worker(object):
     
-    def __init__(self, uuid, **submit_msg):
+    def __init__(self, host, uuid, **submit_msg):
         
+        self.host = host
         self.uuid = uuid
         self.name = submit_msg.get('name') or submit_msg.get('func_name') or uuid
         self.icon = submit_msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
@@ -152,6 +176,10 @@ class Worker(object):
         
         if self.started:
             return
+        
+        if any(x in self.host.active_jobs or x in self.host.failed_jobs for x in self.depends_on):
+            return
+        
         self.started = True
         
         # Launch a worker, and tell it to connect to us.
@@ -206,7 +234,7 @@ class WorkerWidget(QtGui.QFrame):
         self._progress.setRange(0, 0)
         main_layout.addWidget(self._progress)
                 
-        self._status = QtGui.QLabel('starting...')
+        self._status = QtGui.QLabel('Starting...')
         font = self._status.font()
         font.setPointSize(10)
         self._status.setFont(font)
@@ -214,29 +242,31 @@ class WorkerWidget(QtGui.QFrame):
     
     def _handle_message(self, type_, **msg):
         
-        if type_ == 'result':
-            self._status.setText('Done.')
-            self._progress.setRange(0, 1)
-            self._progress.setValue(1)
-            
-        if type_ == 'exception':
-            self._status.setText('Error.')
-            self._progress.setRange(0, 1)
-            self._progress.setValue(0)
+        handler = getattr(self, '_do_worker_%s' % type_, None)
+        if handler is None:
+            return
+        handler(**msg)
+    
+    def _do_worker_blocked(self, **msg):
+        self._status.setText('Waiting for another job...')
         
-        if type_ == 'progress':
-            
-            maximum = msg.get('maximum')
-            if maximum is not None:
-                self._progress.setMaximum(maximum)
-            
-            value = msg.get('value')
-            if value is not None:
-                self._progress.setValue(value)
-            
-            status = msg.get('status')
-            if status is not None:
-                self._status.setText(str(status))
+    def _do_worker_result(self, **msg):
+        self._status.setText('Done.')
+        self._progress.setRange(0, 1)
+        self._progress.setValue(1)
+    
+    def _do_worker_exception(self, **msg):
+        self._status.setText('Error.')
+        self._progress.setRange(0, 1)
+        self._progress.setValue(0)
+    
+    def _do_worker_progress(self, value=None, maximum=None, status=None, **msg):
+        if maximum is not None:
+            self._progress.setMaximum(maximum)
+        if value is not None:
+            self._progress.setValue(value)
+        if status is not None:
+            self._status.setText(str(status))
             
         
 
@@ -281,7 +311,7 @@ def main():
         pid=os.getpid(),
     ))
 
-    message_processor = MessageProcessor(conn)
+    message_processor = Host(conn)
     
     app = QtGui.QApplication([])
     app.setApplicationName('Futures Host')

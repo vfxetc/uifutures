@@ -23,9 +23,6 @@ def worker():
             set_progress(i * 10 + j + 1, maximum=50, status='Working... %d of 50' % (i * 10 + j + 1))
     notify(message='Sleeping is complete.')
 
-def final_message():
-    notify(message='Everyone is done')
-    
 if __name__ == '__main__':
     
     import uifutures.examples.sleep
@@ -37,7 +34,7 @@ if __name__ == '__main__':
             future = executor.submit_ext(uifutures.examples.sleep.worker, name='Sleeper', icon=random.choice(icons))
             futures.append(future)
     
-        final = executor.submit_ext(uifutures.examples.sleep.final_message, name='Waiter', depends_on=futures)
+        final = executor.submit_ext(uifutures.examples.sleep.worker, name='Waiter', depends_on=futures)
     
     # res = final.result()
     
