@@ -139,7 +139,7 @@ class Host(QtCore.QThread):
             title="Job Errored",
             message=worker.name or 'Untitled',
             sticky=True,
-            icon=worker.icon,
+            icon=utils.icon(worker.icon) if worker.icon else None,
         )
         
     def do_worker_shutdown(self, worker):
@@ -162,7 +162,7 @@ class Worker(object):
         self.host = host
         self.uuid = uuid
         self.name = submit_msg.get('name') or submit_msg.get('func_name') or uuid
-        self.icon = submit_msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
+        self.icon = utils.icon(submit_msg.get('icon') or 'fatcow/gear_in')
 
         submit_msg['type'] = 'submit'
         submit_msg['uuid'] = uuid
@@ -311,11 +311,9 @@ def main():
     
     app = QtGui.QApplication([])
     app.setApplicationName('Futures Host')
-    app.setWindowIcon(QtGui.QIcon('/home/mboers/Documents/icons/fatcow/32x32/road_sign.png'))
+    app.setWindowIcon(QtGui.QIcon(utils.icon('fatcow/road_sign')))
     
     dialog = Dialog(message_processor)
-    # dialog.setWindowIcon(QtGui.QIcon('/home/mboers/Documents/icons/fatcow/32x32/road_sign.png'))
-    # dialog.setWindowIconText("Testing")
     
     message_processor.start()
     

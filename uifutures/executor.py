@@ -24,9 +24,8 @@ class DependencyFailed(RuntimeError):
 
 class Executor(_base.Executor):
     
-    def __init__(self):
-        
-        # Launch a host, and tell it to connect to us.
+    def __init__(self, port=None):
+
         self._conn, child_conn = connection.Pipe()
         
         if False:

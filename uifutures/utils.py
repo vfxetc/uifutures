@@ -1,9 +1,10 @@
-import sys
-import time
-import thread
-import re
 from subprocess import call
+import os
 import platform
+import re
+import sys
+import thread
+import time
 
 
 _debug_start = time.time()
@@ -36,6 +37,13 @@ def get_func_name(spec):
     if isinstance(spec, basestring):
         return spec
     return '%s:%s' % (getattr(spec, '__module__', '__module__'), getattr(spec, '__name__', str(spec)))
+
+
+def icon(name):
+    base, ext = os.path.splitext(name)
+    return os.path.abspath(os.path.join(
+        __file__, '..', '..', 'art', 'icons', base + (ext or '.png')
+    ))
 
 
 def notify(message, title=None, app_name=None, sticky=False, icon=None):
