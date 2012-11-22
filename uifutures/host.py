@@ -12,6 +12,7 @@ Qt = QtCore.Qt
 
 from .utils import debug
 from . import utils
+from .executor import DependencyFailed
 
 
 class MessageProcessor(QtCore.QThread):
@@ -71,17 +72,10 @@ class MessageProcessor(QtCore.QThread):
             exit()
     
     def do_executor_submit(self, uuid, **msg):
-        
+        self.open_jobs.add(uuid)
         worker = Worker(uuid, **msg)
         self.new_worker.emit(worker, msg)
-        
-        # Forward the message.
-        msg['type'] = 'submit'
-        msg['uuid'] = uuid
-        worker.conn.send(msg)
-        
         self.workers.append(worker)
-        self.open_jobs.add(uuid)
     
     def do_worker_notify(self, worker, **msg):
         msg.setdefault('icon', worker.icon)
@@ -97,6 +91,7 @@ class MessageProcessor(QtCore.QThread):
         self.conn.send(msg)
     
     def do_worker_exception(self, worker, **msg):
+        
         self.open_jobs.remove(worker.uuid)
         
         # Forward the message.
@@ -125,11 +120,11 @@ class MessageProcessor(QtCore.QThread):
 
 class Worker(object):
     
-    def __init__(self, uuid, **msg):
-    
+    def __init__(self, uuid, **submit_msg):
+        
         self.uuid = uuid
-        self.name = msg.get('name') or msg.get('func_name') or uuid
-        self.icon = msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
+        self.name = submit_msg.get('name') or submit_msg.get('func_name') or uuid
+        self.icon = submit_msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
         
         # self.widget = WorkerWidget(self, **msg)
         
@@ -144,6 +139,12 @@ class Worker(object):
         msg = self.conn.recv()
         if msg.get('type') != 'handshake' or msg.get('pid') != proc.pid:
             raise RuntimeError('could not shake hands with worker: %r' % msg)
+        
+        # Forward the submission.
+        submit_msg['type'] = 'submit'
+        submit_msg['uuid'] = uuid
+        # debug('forwarding %r', submit_msg)
+        self.conn.send(submit_msg)
         
 
 

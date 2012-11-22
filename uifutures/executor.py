@@ -12,9 +12,13 @@ import time
 
 from .utils import debug
 from . import utils
+from .future import Future
 
 
 class HostShutdown(RuntimeError):
+    pass
+
+class DependencyFailed(RuntimeError):
     pass
 
 
@@ -97,10 +101,15 @@ class Executor(_base.Executor):
     def submit(self, func, *args, **kwargs):
         self.submit_ext(func, args, kwargs)
     
-    def submit_ext(self, func, args=None, kwargs=None, name=None, icon=None):
+    def submit_ext(self, func, args=None, kwargs=None, name=None, icon=None, depends_on=None):
         
         uuid = os.urandom(16).encode('hex')
         func_name = utils.get_func_name(func)
+        
+        depends_on = depends_on or []
+        if not isinstance(depends_on, (list, tuple)):
+            depends_on = [depends_on]
+        depends_on = [x.uuid for x in depends_on]
         
         self._conn.send(dict(
             type='submit',
@@ -108,6 +117,7 @@ class Executor(_base.Executor):
             name=name or func_name,
             icon=icon,
             func_name=func_name,
+            depends_on=depends_on,
             package=pickle.dumps(dict(
                 func=func,
                 args=tuple(args or ()),
@@ -115,7 +125,7 @@ class Executor(_base.Executor):
             ), protocol=-1),
         ))
         
-        future = _base.Future()
+        future = Future(uuid)
         self._futures[uuid] = future
         return future
         

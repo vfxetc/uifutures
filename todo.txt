@@ -13,6 +13,6 @@
     - set app icon
 
 - dependencies
-
+    - submit_ext(..., depends_on=future)
 - spawn an independant process for each actual job, just like I did for qbfutures, so that we don't have to worry about code reloading, threading, etc.
 

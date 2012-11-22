@@ -9,7 +9,7 @@ from .utils import debug
 
 
 _conn = None
-
+_job = {}
 
 def notify(**kwargs):
     if _conn:
@@ -51,9 +51,11 @@ def main():
 
 def process(conn):
     
+    global _job
+    
     # Get the message.
     rlist, _, _ = select.select([conn], [], [])
-    msg = conn.recv()
+    _job = msg = conn.recv()
     # debug('Worker: recieved message\n%s', pprint.pformat(msg))
     
     package = pickle.loads(msg['package'])
