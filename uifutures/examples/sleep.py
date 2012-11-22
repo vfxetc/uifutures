@@ -23,7 +23,8 @@ def worker():
             set_progress(i * 10 + j + 1, maximum=50, status='Working... %d of 50' % (i * 10 + j + 1))
     notify(message='Sleeping is complete.')
 
-if __name__ == '__main__':
+
+def main():
     
     import uifutures.examples.sleep
     
@@ -37,4 +38,6 @@ if __name__ == '__main__':
         final = executor.submit_ext(uifutures.examples.sleep.worker, name='Waiter', depends_on=futures)
     
     # res = final.result()
-    
+
+if __name__ == '__main__':
+    main()
