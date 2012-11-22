@@ -11,6 +11,7 @@ from PyQt4 import QtCore, QtGui
 Qt = QtCore.Qt
 
 from .utils import debug
+from . import utils
 
 
 class MessageProcessor(QtCore.QThread):
@@ -82,6 +83,11 @@ class MessageProcessor(QtCore.QThread):
         self.workers.append(worker)
         self.open_jobs.add(uuid)
     
+    def do_worker_notify(self, worker, **msg):
+        msg.setdefault('icon', worker.icon)
+        msg.setdefault('title', worker.name)
+        utils.notify(**msg)
+    
     def do_worker_result(self, worker, **msg):
         self.open_jobs.remove(worker.uuid)
         
@@ -97,6 +103,12 @@ class MessageProcessor(QtCore.QThread):
         msg['type'] = 'exception'
         msg['uuid'] = worker.uuid
         self.conn.send(msg)
+        utils.notify(
+            title="Job Errored",
+            message=worker.name or 'Untitled',
+            sticky=True,
+            icon=worker.icon,
+        )
         
     def do_worker_shutdown(self, worker):
         
@@ -116,6 +128,9 @@ class Worker(object):
     def __init__(self, uuid, **msg):
     
         self.uuid = uuid
+        self.name = msg.get('name') or msg.get('func_name') or uuid
+        self.icon = msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
+        
         # self.widget = WorkerWidget(self, **msg)
         
         # Launch a worker, and tell it to connect to us.
@@ -134,29 +149,36 @@ class Worker(object):
 
 class WorkerWidget(QtGui.QFrame):
     
-    def __init__(self, worker, func_name, **extra):
+    def __init__(self, worker, **extra):
         super(WorkerWidget, self).__init__()
         self._worker = worker
-        self._func_name = func_name
         self._setup_ui()
     
     def _setup_ui(self):
         self.setLayout(QtGui.QHBoxLayout())
         
+        # TODO: Apply this to all but the last one.
+        self.setStyleSheet('''
+            WorkerWidget {
+                border-bottom: 1px dotted rgb(170, 170, 170);
+                border-top: none;
+            }
+        ''')
+        
         self._icon = QtGui.QLabel()
         self.layout().addWidget(self._icon)
-        pixmap = QtGui.QPixmap('/home/mboers/Documents/icons/fatcow/32x32/gear_in.png')
+        pixmap = QtGui.QPixmap(self._worker.icon)
         self._icon.setPixmap(pixmap)
         self._icon.setFixedSize(pixmap.size())
         
         main_layout = QtGui.QVBoxLayout()
         self.layout().addLayout(main_layout)
         
-        self._name = QtGui.QLabel(self._func_name)
+        self._name = QtGui.QLabel(self._worker.name)
         main_layout.addWidget(self._name)
         
         self._progress = QtGui.QProgressBar()
-        self._progress.setFixedHeight(10)
+        self._progress.setFixedHeight(12)
         self._progress.setRange(0, 0)
         main_layout.addWidget(self._progress)
                 

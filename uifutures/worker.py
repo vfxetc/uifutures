@@ -11,6 +11,12 @@ from .utils import debug
 _conn = None
 
 
+def notify(**kwargs):
+    if _conn:
+        kwargs['type'] = 'notify'
+        _conn.send(kwargs)
+
+
 def set_progress(value=None, maximum=None, status=None):
     if _conn is not None:
         _conn.send(dict(

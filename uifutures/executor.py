@@ -95,17 +95,23 @@ class Executor(_base.Executor):
         future.set_exception(exception)
     
     def submit(self, func, *args, **kwargs):
+        self.submit_ext(func, args, kwargs)
+    
+    def submit_ext(self, func, args=None, kwargs=None, name=None, icon=None):
         
         uuid = os.urandom(16).encode('hex')
+        func_name = utils.get_func_name(func)
         
         self._conn.send(dict(
             type='submit',
             uuid=uuid,
-            func_name=utils.get_func_name(func),
+            name=name or func_name,
+            icon=icon,
+            func_name=func_name,
             package=pickle.dumps(dict(
                 func=func,
-                args=args,
-                kwargs=kwargs,
+                args=tuple(args or ()),
+                kwargs=dict(kwargs or {}),
             ), protocol=-1),
         ))
         
