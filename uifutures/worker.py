@@ -11,6 +11,7 @@ from .utils import debug
 _conn = None
 _job = {}
 
+
 def notify(**kwargs):
     if _conn:
         kwargs['type'] = 'notify'

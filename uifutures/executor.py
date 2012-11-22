@@ -54,6 +54,11 @@ class Executor(_base.Executor):
         self._host_listener_thread = threading.Thread(target=self._host_listener)
         self._host_listener_thread.daemon = True
         self._host_listener_thread.start()
+    
+    def shutdown(self, wait=True):
+        self._conn.send(dict(
+            type='shutdown',
+        ))
         
     def _host_listener(self):
         try:

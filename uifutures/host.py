@@ -26,13 +26,20 @@ class MessageProcessor(QtCore.QThread):
         self.conn = conn
         self.workers = []
         self.open_jobs = set()
+        self.failed_jobs = set()
+        self.executor_is_alive = True
     
     def run(self):
         try:
             while True:
                 
                 rlist = [worker.conn for worker in self.workers]
-                rlist.append(self.conn)
+                if self.executor_is_alive:
+                    rlist.append(self.conn)
+                    
+                if not rlist:
+                    break
+                
                 rlist, _, _ = select.select(rlist, [], [])
                 for conn in rlist:
                     
@@ -41,15 +48,12 @@ class MessageProcessor(QtCore.QThread):
                     else:
                         owner_type = 'worker'
                         worker = [x for x in self.workers if x.conn is conn][0]
-                
+                    
+                    # Get a message, turning EOFs into shutdown messages.
                     try:
                         msg = conn.recv()
                     except EOFError:
-                        if owner_type == 'worker':
-                            self.do_worker_shutdown(worker)
-                            continue
-                        else:
-                            return
+                        msg = {'type': 'shutdown'}
                     
                     type_ = msg.pop('type', None)
                     # debug('Host: %r sent %r:\n%s', owner_type, type_, pprint.pformat(msg))
@@ -67,15 +71,24 @@ class MessageProcessor(QtCore.QThread):
         
         except:
             traceback.print_exc()
-            debug('HOST SHUTTING DOWN')
-            self.conn.send(dict(type='shutdown'))
-            exit()
+            QtGui.QApplication.exit(1)
+        
+        finally:
+            if self.executor_is_alive:
+                self.conn.send(dict(type='shutdown'))
+        
+        if not self.failed_jobs:
+            QtGui.QApplication.exit(0)
     
     def do_executor_submit(self, uuid, **msg):
         self.open_jobs.add(uuid)
         worker = Worker(uuid, **msg)
         self.new_worker.emit(worker, msg)
         self.workers.append(worker)
+    
+    def do_executor_shutdown(self, **msg):
+        # debug('Host: executor shut down')
+        self.executor_is_alive = False
     
     def do_worker_notify(self, worker, **msg):
         msg.setdefault('icon', worker.icon)
@@ -92,6 +105,7 @@ class MessageProcessor(QtCore.QThread):
     
     def do_worker_exception(self, worker, **msg):
         
+        self.failed_jobs.add(worker.uuid)
         self.open_jobs.remove(worker.uuid)
         
         # Forward the message.
@@ -112,10 +126,10 @@ class MessageProcessor(QtCore.QThread):
         
         # It wasn't done it's job.
         if worker.uuid in self.open_jobs:
-            self.conn.send(dict(type='exception', exception=RuntimeError('worker shutdown unexpectedly')))
-        else:
-            pass
-            # debug('Host: worker shutdown after job')
+            self.do_worker_exception(worker, dict(
+                type='exception',
+                exception=RuntimeError('worker shutdown unexpectedly'),
+            ))
 
 
 class Worker(object):
@@ -125,8 +139,20 @@ class Worker(object):
         self.uuid = uuid
         self.name = submit_msg.get('name') or submit_msg.get('func_name') or uuid
         self.icon = submit_msg.get('icon') or '/home/mboers/Documents/icons/fatcow/32x32/gear_in.png'
+
+        submit_msg['type'] = 'submit'
+        submit_msg['uuid'] = uuid
+        self.submit_msg = submit_msg
         
-        # self.widget = WorkerWidget(self, **msg)
+        self.started = False
+        self.depends_on = submit_msg['depends_on']
+        self.poke()
+    
+    def poke(self):
+        
+        if self.started:
+            return
+        self.started = True
         
         # Launch a worker, and tell it to connect to us.
         self.conn, child_conn = connection.Pipe()
@@ -141,10 +167,7 @@ class Worker(object):
             raise RuntimeError('could not shake hands with worker: %r' % msg)
         
         # Forward the submission.
-        submit_msg['type'] = 'submit'
-        submit_msg['uuid'] = uuid
-        # debug('forwarding %r', submit_msg)
-        self.conn.send(submit_msg)
+        self.conn.send(self.submit_msg)
         
 
 
@@ -272,7 +295,7 @@ def main():
     
     dialog.show()
     
-    app.exec_()
+    exit(app.exec_())
 
 
 if __name__ == '__main__':
