@@ -3,6 +3,8 @@
 
 - uifutures.Executor(title='Job Queue', app_key='default')
     - eventually reconnect to /tmp/uifutures.{app_key}.sock
+        - this will require a host to have multiple executor connections, and
+          for workers to know which one they came from
     - set app name
     - set app icon
 
@@ -10,4 +12,8 @@
 - make Future pickleable and able to reconnect to executor from a worker
     - if you pass a future then a parent failing doesn't nessesarily mean
       that a child will fail, as it may be able to catch the exception
+
+- subjobs
+    - they appear as additional progress bars and status lines under the main
+      one
 
