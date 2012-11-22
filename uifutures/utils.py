@@ -7,6 +7,9 @@ import thread
 import time
 
 
+_platform_system = platform.system()
+
+
 _debug_start = time.time()
 _debug_last = _debug_start
 _debug_thread_ids = {}
@@ -51,7 +54,7 @@ def notify(message, title=None, app_name=None, sticky=False, icon=None):
     if title is None:
         title = 'Job Queue'
     
-    if platform.system() == 'Darwin':
+    if _platform_system == 'Darwin':
         argv = ['growlnotify', '--message', message]
         if app_name:
             argv.extend(('--name', app_name))
