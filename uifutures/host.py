@@ -188,12 +188,6 @@ class Worker(object):
         proc = subprocess.Popen(cmd)
         child_conn.close()
         
-        # Wait for the handshake.
-        # TODO: Make this non-blocking, or have a timeout.
-        msg = self.conn.recv()
-        if msg.get('type') != 'handshake' or msg.get('pid') != proc.pid:
-            raise RuntimeError('could not shake hands with worker: %r' % msg)
-        
         # Forward the submission.
         self.conn.send(self.submit_msg)
         
@@ -241,7 +235,6 @@ class WorkerWidget(QtGui.QFrame):
         main_layout.addWidget(self._status)
     
     def _handle_message(self, type_, **msg):
-        
         handler = getattr(self, '_do_worker_%s' % type_, None)
         if handler is None:
             return
@@ -249,6 +242,9 @@ class WorkerWidget(QtGui.QFrame):
     
     def _do_worker_blocked(self, **msg):
         self._status.setText('Waiting for another job...')
+    
+    def _do_worker_handshake(self, pid, **msg):
+        self._status.setText('Running as PID %d' % pid)
         
     def _do_worker_result(self, **msg):
         self._status.setText('Done.')

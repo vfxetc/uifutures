@@ -1,18 +1,13 @@
 
-- growl (or QtApplication.notify) when done
-
-- set_progress(value, maximum=None, task=None, status=None)
-- set_status(message)
-- notify(message)
-- user_cancelled()
-
+- uifutures.worker.did_user_cancel()
 
 - uifutures.Executor(title='Job Queue', app_key='default')
     - eventually reconnect to /tmp/uifutures.{app_key}.sock
     - set app name
     - set app icon
 
-- dependencies
-    - submit_ext(..., depends_on=future)
-- spawn an independant process for each actual job, just like I did for qbfutures, so that we don't have to worry about code reloading, threading, etc.
+- auto dependency tracking by looking in args/kwargs for Futures
+- make Future pickleable and able to reconnect to executor from a worker
+    - if you pass a future then a parent failing doesn't nessesarily mean
+      that a child will fail, as it may be able to catch the exception
 

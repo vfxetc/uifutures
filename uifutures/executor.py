@@ -42,11 +42,9 @@ class Executor(_base.Executor):
         proc = subprocess.Popen(cmd, env=env)
         child_conn.close()
         
-        # Wait for the handshake.
-        # TODO: Make this non-blocking, or have a timeout.
-        msg = self._conn.recv()
-        if msg.get('type') != 'handshake' or msg.get('pid') != proc.pid:
-            raise RuntimeError('could not shake hands with host: %r' % msg)
+        # Later, we may need to wait on the handshake to make sure that the
+        # process has started. But since we know that the socket is open since
+        # it is an OS pipe, we don't have to wait.
         
         self._futures = {}
         
