@@ -30,7 +30,7 @@ def main():
     
     import uifutures.examples.sleep
     
-    with Executor() as executor:
+    with Executor(max_workers=3) as executor:
         
         dies = executor.submit_ext(uifutures.examples.sleep.worker, args=(3, ), name="Dies at 3")
         wait_for_death = executor.submit_ext(uifutures.examples.sleep.worker, name='Wait for Death', depends_on=[dies])

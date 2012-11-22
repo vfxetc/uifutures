@@ -24,7 +24,7 @@ class DependencyFailed(RuntimeError):
 
 class Executor(_base.Executor):
     
-    def __init__(self, port=None):
+    def __init__(self, max_workers=None):
 
         self._conn, child_conn = connection.Pipe()
         
@@ -44,6 +44,13 @@ class Executor(_base.Executor):
         # Later, we may need to wait on the handshake to make sure that the
         # process has started. But since we know that the socket is open since
         # it is an OS pipe, we don't have to wait.
+        
+        # Send some configuration over.
+        if max_workers:
+            self._conn.send(dict(
+                type='config',
+                max_workers=max_workers,
+            ))
         
         self._futures = {}
         
@@ -95,7 +102,7 @@ class Executor(_base.Executor):
         future.set_result(result)
         
     def _do_exception(self, uuid, **msg):
-        debug('Executor: %s errored', uuid)
+        # debug('Executor: %s errored', uuid)
         future = self._futures.pop(uuid)
         exception = (pickle.loads(msg['package']) if 'package' in msg else msg)['exception']
         future.set_exception(exception)
