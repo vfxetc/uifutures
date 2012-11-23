@@ -84,7 +84,8 @@ class Executor(_base.Executor):
                     else:
                         raise
         except EOFError:
-            debug('Executor: EOF')
+            pass
+            # debug('Executor: EOF')
         finally:
             self._do_shutdown()
     

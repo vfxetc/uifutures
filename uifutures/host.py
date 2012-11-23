@@ -282,6 +282,8 @@ class WorkerWidget(QtGui.QFrame):
             }
         ''')
         
+        self._thumbnail = None
+        
         self._icon = QtGui.QLabel()
         self.layout().addWidget(self._icon)
         pixmap = QtGui.QPixmap(self._worker.icon)
@@ -292,7 +294,9 @@ class WorkerWidget(QtGui.QFrame):
         self.layout().addLayout(main_layout)
         
         self._name = QtGui.QLabel(self._worker.name)
-        main_layout.addWidget(self._name)
+        self._name_layout = QtGui.QHBoxLayout()
+        self._name_layout.addWidget(self._name)
+        main_layout.addLayout(self._name_layout)
         
         self._progress = QtGui.QProgressBar()
         self._progress.setFixedHeight(12)
@@ -365,6 +369,21 @@ class WorkerWidget(QtGui.QFrame):
             self._progress.setValue(value)
         if status is not None:
             self._status.setText(str(status))
+    
+    def _do_thumbnail(self, path):
+        
+        return
+        
+        if self._thumbnail is None:
+            self._icon.setPixmap(self._icon.pixmap().scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self._icon.setFixedSize(self._icon.pixmap().size())
+            self._name_layout.insertWidget(0, self._icon)
+            self._thumbnail = QtGui.QLabel()
+            self.layout().insertWidget(0, self._thumbnail)
+            
+        pixmap = QtGui.QPixmap(path)
+        pixmap = pixmap.scaled(120, 80, Qt.KeepAspectRatio)
+        self._thumbnail.setPixmap(pixmap)
             
         
 

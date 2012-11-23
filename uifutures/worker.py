@@ -27,6 +27,12 @@ def set_progress(value=None, maximum=None, status=None):
             status=status,
         ))
 
+def set_thumbnail(path):
+    if _conn is not None:
+        _conn.send(dict(
+            type='thumbnail',
+            path=path,
+        ))
 
 def main():
     
