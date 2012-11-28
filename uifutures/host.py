@@ -6,6 +6,7 @@ import _multiprocessing
 import pprint
 import select
 import subprocess
+import time
 
 from PyQt4 import QtCore, QtGui
 Qt = QtCore.Qt
@@ -55,7 +56,7 @@ class Host(QtCore.QThread):
         
         # All workers with are non of ACTIVE, FAILED, or DEPENDENCY_FAILED.
         self.unfinished_workers = []
-    
+        
     def run(self):
         try:
             
@@ -96,9 +97,15 @@ class Host(QtCore.QThread):
                 if self.conn is not None:
                     rlist.append(self.conn)
                 
-                # We have nothing left to listen do; everything is complete or
-                # failed.
                 if not rlist:
+                    
+                    # Wait for changes if there is something that failed, as
+                    # the user may hit "Retry".
+                    if any(x.state in failed_states for x in self.workers.itervalues()):
+                        time.sleep(0.25)
+                        continue
+                    
+                    # There is nothing left to do, and the executor is closed.
                     break
                 
                 rlist, _, _ = select.select(rlist, [], [])
@@ -194,9 +201,12 @@ class Host(QtCore.QThread):
         msg['type'] = 'exception'
         msg['uuid'] = worker.uuid
         self.send(msg)
+        msg.setdefault('exception_name', 'Unknown')
+        msg.setdefault('exception_message', 'unknown')
+        msg.setdefault('exception_traceback', '')
         utils.notify(
             title='Job Failed: %s' % (worker.name or 'Untitled'),
-            message='{exception_name}: {exception_message}'.format(**msg),
+            message='{exception_name}: {exception_message}\n{exception_traceback}'.format(**msg),
             sticky=True,
             icon=utils.icon(worker.icon) if worker.icon else None,
         )
@@ -229,9 +239,11 @@ class Worker(object):
         self.state = INITED
         self.conn = None
         self.depends_on = submit_msg['depends_on']
+        
+        self.retry_count = 0
     
     def poke(self, allow_start):
-        
+                    
         if self.state not in waiting_states:
             return
         
@@ -258,7 +270,25 @@ class Worker(object):
         
         # Forward the submission.
         self.conn.send(self.submit_msg)
+    
+    def retry(self):
         
+        self.retry_count += 1
+        
+        # Reset our connection.
+        self.conn = None
+        
+        # Back to the front of the line for us.
+        self.state = INITED
+        self.host.unfinished_workers.insert(0, self)
+        
+        for worker in self.host.workers.values():
+            if worker.state == DEPENDENCY_FAILED and self.uuid in worker.depends_on:
+                
+                # To the end of the line for anything that depended on us.
+                # We must maintain the ordering of dependencies in the queue.
+                worker.state = INITED
+                self.host.unfinished_workers.append(worker)
 
 
 class WorkerWidget(QtGui.QFrame):
@@ -290,7 +320,7 @@ class WorkerWidget(QtGui.QFrame):
         self._icon.setPixmap(pixmap)
         self._icon.setFixedSize(pixmap.size())
         
-        main_layout = QtGui.QVBoxLayout()
+        self._main_layout = main_layout = QtGui.QVBoxLayout()
         self.layout().addLayout(main_layout)
         
         self._name = QtGui.QLabel(self._worker.name)
@@ -308,6 +338,23 @@ class WorkerWidget(QtGui.QFrame):
         font.setPointSize(10)
         self._status.setFont(font)
         main_layout.addWidget(self._status)
+        
+        self._button_layout = QtGui.QVBoxLayout()
+        main_layout.addLayout(self._button_layout)
+        self._buttons = []
+    
+    def _empty_buttons(self):
+        for x in self._buttons:
+            x.hide()
+            x.destroy()
+        self._main_layout.removeItem(self._button_layout)
+        self._button_layout = QtGui.QHBoxLayout()
+        self._main_layout.addLayout(self._button_layout)
+        self._buttons = []
+    
+    def _add_button(self, x):
+        self._button_layout.addWidget(x)
+        self._buttons.append(x)
     
     def _on_context_menu(self, point):
         menu = QtGui.QMenu()
@@ -339,6 +386,9 @@ class WorkerWidget(QtGui.QFrame):
     def _do_transition_to_blocked(self, **msg):
         self._status.setText('Waiting for another job...')
         
+        # This may have come from a failed state.
+        self._status.setStyleSheet('')
+        
     def _do_transition_to_active(self, **msg):
         self._status.setText('Starting...')
     
@@ -352,7 +402,29 @@ class WorkerWidget(QtGui.QFrame):
     
     def _do_exception(self, exception_name, exception_message, **msg):
         self._set_failure('%s: %s' % (exception_name, exception_message))
+        
+        self._empty_buttons()
+        
+        button = QtGui.QToolButton()
+        button.setText("Try Again")
+        button.setStyleSheet('font-size: 9px;')
+        button.clicked.connect(self._retry)
+        self._add_button(button)
+        
+        button = QtGui.QToolButton()
+        button.setText("Report Bug")
+        button.setStyleSheet('font-size: 9px;')
+        # self._add_button(button)
+        button.setEnabled(False)
+        
+        self._button_layout.addStretch()
     
+    def _retry(self):
+        self._status.setText('Resubmitting...')
+        self._status.setStyleSheet('')
+        self._worker.retry()
+        self._empty_buttons()
+        
     def _do_transition_to_dependency_failed(self, **msg):
         self._set_failure('Dependency failed.')
     

@@ -36,7 +36,7 @@ def main():
     with Executor(max_workers=3) as executor:
         
         thumbs = glob.glob('/var/tmp/srv_playblast/GB_007_001_Anim_mike_testing_v0002_r0002_0000/*.jpg')
-        show_thumbs = executor.submit(uifutures.examples.sleep.worker, thumbnails=thumbs)
+        # show_thumbs = executor.submit(uifutures.examples.sleep.worker, thumbnails=thumbs)
         dies = executor.submit_ext(uifutures.examples.sleep.worker, args=(3, ), name="Dies at 3")
         wait_for_death = executor.submit_ext(uifutures.examples.sleep.worker, name='Wait for Death', depends_on=[dies])
         

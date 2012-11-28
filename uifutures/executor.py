@@ -63,7 +63,7 @@ class Executor(_base.Executor):
         self._conn.send(dict(
             type='shutdown',
         ))
-        
+    
     def _host_listener(self):
         try:
             while self._host_alive:
@@ -89,9 +89,12 @@ class Executor(_base.Executor):
         finally:
             self._do_shutdown()
     
+    def _do_handshake(self, pid):
+        pass
+    
     def _do_shutdown(self):
         self._host_alive = False
-        debug('Executor: host shutdown')
+        # debug('Executor: host shutdown')
         for future in self._futures.itervalues():
             future.set_exception(HostShutdown('host shutdown'))
     
