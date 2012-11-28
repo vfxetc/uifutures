@@ -4,6 +4,7 @@ import pprint
 import sys
 import os
 import cPickle as pickle
+import traceback
 
 from .utils import debug
 
@@ -12,9 +13,10 @@ _conn = None
 _job = {}
 
 
-def notify(**kwargs):
+def notify(message, **kwargs):
     if _conn:
         kwargs['type'] = 'notify'
+        kwargs['message'] = message
         _conn.send(kwargs)
 
 
@@ -53,6 +55,7 @@ def main():
             type='exception',
             exception_name=type(e).__name__,
             exception_message=str(e),
+            exception_traceback=traceback.format_exc(),
             package=pickle.dumps(dict(
                 exception=e,
             ), protocol=-1),
