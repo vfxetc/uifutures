@@ -2,11 +2,8 @@ from concurrent.futures import _base
 from multiprocessing import connection
 import cPickle as pickle
 import os
-import platform
-import pprint
 import select
 import subprocess
-import tempfile
 import threading
 import time
 
@@ -38,7 +35,7 @@ class Executor(_base.Executor):
             cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
             env = None
         
-        proc = subprocess.Popen(cmd, env=env)
+        self.proc = subprocess.Popen(cmd, env=env)
         child_conn.close()
         
         # Later, we may need to wait on the handshake to make sure that the

@@ -1,12 +1,9 @@
 import select
 import _multiprocessing
-import pprint
 import sys
 import os
 import cPickle as pickle
 import traceback
-
-from .utils import debug
 
 
 _conn = None

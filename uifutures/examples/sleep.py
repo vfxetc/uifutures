@@ -35,17 +35,17 @@ def main():
     
     with Executor(max_workers=3) as executor:
         
-        thumbs = glob.glob('/var/tmp/srv_playblast/GB_007_001_Anim_mike_testing_v0002_r0002_0000/*.jpg')
+        glob.glob('/var/tmp/srv_playblast/GB_007_001_Anim_mike_testing_v0002_r0002_0000/*.jpg')
         # show_thumbs = executor.submit(uifutures.examples.sleep.worker, thumbnails=thumbs)
         dies = executor.submit_ext(uifutures.examples.sleep.worker, args=(3, ), name="Dies at 3")
-        wait_for_death = executor.submit_ext(uifutures.examples.sleep.worker, name='Wait for Death', depends_on=[dies])
+        executor.submit_ext(uifutures.examples.sleep.worker, name='Wait for Death', depends_on=[dies])
         
         futures = []
         for i in range(3):
             future = executor.submit_ext(uifutures.examples.sleep.worker, name='Job #%d' % (i + 1), icon=random.choice(icons))
             futures.append(future)
     
-        final = executor.submit_ext(uifutures.examples.sleep.worker, name='Reducer', depends_on=futures)
+        executor.submit_ext(uifutures.examples.sleep.worker, name='Reducer', depends_on=futures)
     
     # res = final.result()
 

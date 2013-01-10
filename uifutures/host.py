@@ -3,17 +3,13 @@ import os
 import traceback
 from multiprocessing import connection
 import _multiprocessing
-import pprint
 import select
 import subprocess
 import time
 
-from PyQt4 import QtCore, QtGui
-Qt = QtCore.Qt
+from uitools.qt import Qt, QtCore, QtGui
 
-from .utils import debug
 from . import utils
-from .executor import DependencyFailed
 
 
 NotSet = object()
@@ -265,7 +261,7 @@ class Worker(object):
         # Launch a worker, and tell it to connect to us.
         self.conn, child_conn = connection.Pipe()
         cmd = ['python', '-m', 'uifutures.sandbox.the_corner', str(child_conn.fileno())]
-        proc = subprocess.Popen(cmd)
+        self.proc = subprocess.Popen(cmd)
         child_conn.close()
         
         # Forward the submission.
@@ -368,7 +364,7 @@ class WorkerWidget(QtGui.QFrame):
         handler(**msg)
     
     def _do_state_changed(self, **msg):
-        old = msg['old'].lower()
+        # old = msg['old'].lower()
         new = msg['new'].lower()
         # debug('Host: %s transition from %s to %s', self._worker.uuid, old, new)
         handlers = [
