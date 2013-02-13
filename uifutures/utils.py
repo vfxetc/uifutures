@@ -1,13 +1,9 @@
 from subprocess import call
 import os
-import platform
 import re
 import sys
 import thread
 import time
-
-
-_platform_system = platform.system()
 
 
 _debug_start = time.time()
@@ -54,7 +50,7 @@ def notify(message, title=None, app_name=None, sticky=False, icon=None):
     if title is None:
         title = 'Job Queue'
     
-    if _platform_system == 'Darwin':
+    if sys.platform.startswith('darwin'):
         argv = ['growlnotify', '--message', message]
         if app_name:
             argv.extend(('--name', app_name))
