@@ -27,3 +27,14 @@
       one
 
 - jobs can prompt for buttons, like the Finder copy override buttons
+
+- uifutures.worker.set_config(close_when_complete=False)
+- uifutures.worker.set_actions(*buttons); create buttons which run whatever
+    {
+        'name': 'Open Shotgun',
+        'func': 'subprocess:call',
+        'args': [['open', entity.url]],
+    }
+
+- "Report Bug" on uifutures failure
+    - use the sgactions.ticketui functions
