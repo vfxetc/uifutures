@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
 
@@ -7,7 +7,7 @@ setup(
     description='Qt UI for background jobs.',
     url='http://github.com/westernx/uifutures',
     
-    packages=['uifutures'],
+    packages=find_packages(exclude=['build*', 'tests*']),
     
     author='Mike Boers',
     author_email='uifutures@mikeboers.com',
