@@ -41,7 +41,7 @@ def get_func_name(spec):
 def icon(name):
     base, ext = os.path.splitext(name)
     return os.path.abspath(os.path.join(
-        __file__, '..', '..', 'art', 'icons', base + (ext or '.png')
+        __file__, '..', 'art', 'icons', base + (ext or '.png')
     ))
 
 

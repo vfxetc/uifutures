@@ -8,3 +8,6 @@
 
 # Build files.
 /docs/_build
+/build
+/dist
+*.egg-info
