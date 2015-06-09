@@ -24,18 +24,11 @@ class Executor(_base.Executor):
     def __init__(self, max_workers=None):
 
         self._conn, child_conn = connection.Pipe()
-        
-        if False:
-            cmd = [os.path.abspath(os.path.join(
-                __file__, '..', '..', 'Futures.app', 'Contents', 'MacOS', 'uifutures' 
-            ))]
-            env = dict(os.environ)
-            env['UIFUTURES_HOST_FD'] = str(child_conn.fileno())
-        else:
-            cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
-            env = None
-        
+
+        cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
+        env = None
         self.proc = subprocess.Popen(cmd, env=env)
+        
         child_conn.close()
         
         # Later, we may need to wait on the handshake to make sure that the
