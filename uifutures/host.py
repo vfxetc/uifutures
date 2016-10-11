@@ -456,10 +456,10 @@ class WorkerWidget(QtGui.QFrame):
         
 
 
-class Dialog(QtGui.QDialog):
+class Window(QtGui.QMainWindow):
     
     def __init__(self, host):
-        super(Dialog, self).__init__()
+        super(Window, self).__init__()
         self._setup_ui()
         self._uuid_to_widget = {}
         
@@ -469,10 +469,14 @@ class Dialog(QtGui.QDialog):
         
         self.setWindowTitle("Job Queue")
         self.setMinimumWidth(400)
-        
-        self.setLayout(QtGui.QVBoxLayout())
-        self.layout().setSpacing(0)
-        self.layout().setContentsMargins(0, 0, 0, 0)
+
+        self._widget = QtGui.QWidget()
+        self.setCentralWidget(self._widget)
+        self._layout = QtGui.QVBoxLayout()
+        self._widget.setLayout(self._layout)
+
+        self._layout.setSpacing(0)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         
     def _on_worker_message(self, worker, type_, msg):
         
@@ -480,7 +484,7 @@ class Dialog(QtGui.QDialog):
         if worker.uuid not in self._uuid_to_widget:
             widget = WorkerWidget(worker, type=type_, **msg)
             self._uuid_to_widget[worker.uuid] = widget
-            self.layout().addWidget(widget)
+            self._layout.addWidget(widget)
         
         self._uuid_to_widget[worker.uuid]._handle_message(type_, **msg)
             
@@ -505,11 +509,11 @@ def main():
     app.setApplicationName('Futures Host')
     app.setWindowIcon(QtGui.QIcon(utils.icon('fatcow/road_sign')))
     
-    dialog = Dialog(host)
+    window = Window(host)
     
     host.start()
     
-    dialog.show()
+    window.show()
     
     exit(app.exec_())
 
