@@ -25,7 +25,13 @@ class Executor(_base.Executor):
 
         self._conn, child_conn = connection.Pipe()
 
-        cmd = ['python', '-m', 'uifutures.host', str(child_conn.fileno())]
+        # Run the host in a brand-new bash. This gives the shell RC files
+        # the chance to clean our whatever garbage the calling application
+        # (e.g. Maya) has put into the environment. Ideally this would be
+        # cleaned up by sitetools.environ, but I haven't had much success
+        # with doing that at Mark Media.
+        # TODO: Go back to calling python directly when that is fixed.
+        cmd = ['bash', '-lc', 'python -m uifutures.host %s' % child_conn.fileno()]
         env = None
         self.proc = subprocess.Popen(cmd, env=env)
         
